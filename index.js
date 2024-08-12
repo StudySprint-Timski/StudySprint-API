@@ -8,6 +8,7 @@ require('./passport')(passport);
 const authRoutes = require('./routes/auth/auth');
 const googleAuthRoutes = require('./routes/auth/auth_google');
 const testRoutes = require('./routes/test/test')
+const sessionRoutes = require('./routes/session/session')
 
 const authenticate = require('./middleware/authenticate');
 
@@ -26,6 +27,7 @@ app.use(passport.initialize());
 app.use('/auth', authRoutes);
 app.use('/auth/google', googleAuthRoutes);
 app.use("/test", [authenticate], testRoutes)
+app.use('/session', [authenticate], sessionRoutes )
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
