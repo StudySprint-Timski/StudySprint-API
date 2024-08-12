@@ -7,6 +7,7 @@ require('./passport')(passport);
 
 const authRoutes = require('./routes/auth/auth');
 const googleAuthRoutes = require('./routes/auth/auth_google');
+const discordAuthRoutes = require('./routes/auth/auth_discord');
 const testRoutes = require('./routes/test/test')
 const sessionRoutes = require('./routes/session/session')
 
@@ -26,6 +27,7 @@ app.use(passport.initialize());
 
 app.use('/auth', authRoutes);
 app.use('/auth/google', googleAuthRoutes);
+app.use('/auth/discord', discordAuthRoutes);
 app.use("/test", [authenticate], testRoutes)
 app.use('/session', [authenticate], sessionRoutes )
 
