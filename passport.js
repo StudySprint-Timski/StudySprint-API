@@ -1,6 +1,7 @@
 const JwtStrategy = require('passport-jwt').Strategy;
 const ExtractJwt = require('passport-jwt').ExtractJwt;
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const DiscordStrategy = require('passport-discord').Strategy;
 const mongoose = require('mongoose');
 const User = require('./models/User');
 
@@ -37,6 +38,31 @@ module.exports = passport => {
           googleId: profile.id,
           name: profile.displayName,
           email: profile.emails[0].value
+        });
+        newUser.save()
+          .then(user => done(null, user))
+          .catch(err => done(err, false));
+      }
+    });
+  }));
+
+  passport.use(new DiscordStrategy({
+      clientID: process.env.DISCORD_CLIENT_ID,
+      clientSecret: process.env.DISCORD_CLIENT_SECRET,
+      callbackURL: '/auth/discord/callback',
+      scope: ['identify', 'email', 'guilds', 'guilds.join']
+  },
+  (accessToken, refreshToken, profile, done) => {
+    console.log(profile)
+    User.findOne({ discordId: profile.id }).then(existingUser => {
+      if (existingUser) {
+        return done(null, existingUser);
+      } else {
+        const newUser = new User({
+          discordId: profile.id,
+          name: profile.username,
+          email: profile.email,
+          userType: 'discord'
         });
         newUser.save()
           .then(user => done(null, user))

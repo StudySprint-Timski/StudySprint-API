@@ -22,6 +22,10 @@ const UserSchema = new Schema({
     type: String,
     unique: true
   },
+  discordId: {
+    type: String,
+    unique: true
+  },
   userType: {
     type: String,
     default: 'generic'
