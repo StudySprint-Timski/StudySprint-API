@@ -12,9 +12,7 @@ const upload = multer({ storage: storage });
 
 router.post('/upload', upload.single('file'), async (req, res) => {
   try{
-    const file = req.file;
-
-    const upload_result = await uploadFileToMinio(file, req.user.id);
+    const upload_result = await uploadFileToMinio(req.file, req.user.id, req.get("host"));
 
     // Respond with the file URL
     res.status(201).json({ "fileUrl": upload_result.fileUrl, "uploadDate": upload_result.uploadDate });
