@@ -29,6 +29,10 @@ const UserSchema = new Schema({
   userType: {
     type: String,
     default: 'generic'
+  },
+  profilePicture: {
+    type: String,
+    default: null
   }
 });
 
