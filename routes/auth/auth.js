@@ -6,6 +6,9 @@ const mongoose = require('mongoose');
 const User = require('../../models/User');
 const router = express.Router();
 
+const authenticate = require('../../middleware/authenticate')
+const extractUser = require('../../middleware/extractUser')
+
 // Register new user with email, name and password
 router.post('/register', (req, res) => {
   const { name, email, password } = req.body;
@@ -51,6 +54,45 @@ router.post('/login', (req, res) => {
       }
     });
   });
+});
+
+router.put('/update-password', [authenticate, extractUser], (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if(currentPassword === undefined || newPassword === undefined) {
+      res.status(400).json({ message: 'No current or new password provided' })
+    }
+
+    // Find the authenticated user by ID
+    User.findById(req.user.id).then(user => {
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Check if the current password is correct
+      bcrypt.compare(currentPassword, user.password).then(isMatch => {
+        if (!isMatch) {
+          return res.status(400).json({ message: 'Current password is incorrect' });
+        }
+
+        // Hash the new password and update it
+        bcrypt.genSalt(10, (err, salt) => {
+          if (err) throw err;
+          bcrypt.hash(newPassword, salt, (err, hash) => {
+            if (err) throw err;
+            user.password = hash;
+            user.save()
+              .then(() => res.json({ message: 'Password updated successfully' }))
+              .catch(err => res.status(500).json({ error: err.message }));
+          });
+        });
+      });
+    });
+  }
+  catch(e) {
+    res.status(400).send();
+  }
 });
 
 module.exports = router;
