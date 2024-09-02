@@ -1,23 +1,25 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const Minio = require('minio');
+const { S3Client, CreateBucketCommand, HeadBucketCommand, GetObjectCommand, PutObjectCommand, PutBucketPolicyCommand, PutPublicAccessBlockCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+
 const path = require('path');
 const fs = require('fs');
 const File = require('../models/File');
 
 require('dotenv').config();
 
-// MinIO Client Configuration
-const minioClient = new Minio.Client({
-    endPoint: process.env.S3_ENDPOINT,
-    port: parseInt(process.env.S3_PORT) || 9000,
-    useSSL: process.env.S3_USE_SSL === 'true',
-    accessKey: process.env.S3_USER,
-    secretKey: process.env.S3_PASSWORD,
+// AWS S3 Client Configuration (v3)
+const s3Client = new S3Client({
+    region: process.env.S3_REGION,
+    credentials: {
+        accessKeyId: process.env.S3_ACCESS_KEY,
+        secretAccessKey: process.env.S3_SECRET_KEY,
+    },
 });
 
-const uploadFileToMinio = async (file, userId, hostname) => {
+const uploadFile = async (file, userId, hostname) => {
     try {
         if (!file) {
             throw new Error('No file uploaded.');
@@ -25,31 +27,70 @@ const uploadFileToMinio = async (file, userId, hostname) => {
 
         const bucketName = `bucket-${Date.now()}`;
 
-        const bucketExists = await minioClient.bucketExists(bucketName);
-        if (!bucketExists) {
-            await minioClient.makeBucket(bucketName, 'us-east-1');
+        // Check if the bucket exists
+        try {
+            await s3Client.send(new HeadBucketCommand({ Bucket: bucketName }));
+        } catch (error) {
+            if (error.$metadata.httpStatusCode === 404) {
+                // Bucket doesn't exist, create it
+                await s3Client.send(new CreateBucketCommand({ Bucket: bucketName, ObjectOwnership: 'BucketOwnerPreferred' }));
+            } else {
+                throw error;
+            }
         }
 
-        const bucketPolicy = {
+        const modifyBucketConfigParams = {
+            Bucket: bucketName,
+            PublicAccessBlockConfiguration: {
+              BlockPublicAcls: false,
+              IgnorePublicAcls: false,
+              BlockPublicPolicy: false,
+              RestrictPublicBuckets: false,
+              BlockPublicAccess: false,
+            },
+        };
+
+        await s3Client.send(new PutPublicAccessBlockCommand(modifyBucketConfigParams));
+
+        // Define the bucket policy
+        const policy = {
             Version: "2012-10-17",
             Statement: [
-                {
-                    Effect: "Allow",
-                    Principal: "*",
-                    Action: "s3:GetObject",
-                    Resource: `arn:aws:s3:::${bucketName}/*`
-                }
-            ]
+              {
+                Sid: "PublicReadGetObject",
+                Effect: "Allow",
+                Principal: "*",
+                Action: "s3:GetObject",
+                Resource: `arn:aws:s3:::${bucketName}/*`,
+              },
+            ],
         };
-        await minioClient.setBucketPolicy(bucketName, JSON.stringify(bucketPolicy));
+
+        await s3Client.send(new PutBucketPolicyCommand({
+            Bucket: bucketName,
+            Policy: JSON.stringify(policy)
+        }));
 
         const objectName = file.originalname;
-        await minioClient.putObject(bucketName, objectName, file.buffer, {
-            'Content-Type': file.mimetype,
+
+        // Upload the file to S3
+        await s3Client.send(new PutObjectCommand({
+            Bucket: bucketName,
+            Key: objectName,
+            Body: file.buffer,
+            ContentType: file.mimetype,
+            ACL: "public-read"
+        }));
+
+        const command = new GetObjectCommand({
+            Bucket: bucketName,
+            Key: objectName,
         });
 
-        const fileUrl = `${minioClient.useSSL ? 'https' : 'http'}://${hostname || 'localhost'}:${minioClient.port}/${bucketName}/${objectName}`;
+        // Generate a signed URL (you can configure expiration time as needed)
+        const fileUrl = await getSignedUrl(s3Client, command); // 1-hour expiration
 
+        // Save the file metadata to the database
         const newFile = new File({
             bucketName: bucketName,
             fileName: objectName,
@@ -74,4 +115,4 @@ const uploadFileToMinio = async (file, userId, hostname) => {
     }
 };
 
-module.exports = uploadFileToMinio;
+module.exports = uploadFile;
