@@ -20,11 +20,9 @@ const UserSchema = new Schema({
   },
   googleId: {
     type: String,
-    unique: true
   },
   discordId: {
     type: String,
-    unique: true
   },
   userType: {
     type: String,
