@@ -67,7 +67,11 @@ router.post('/callback', async (req, res) => {
       audience: process.env.GOOGLE_CLIENT_ID,
     });
 
+    console.log('ticket:', ticket)
+
     const payload = ticket.getPayload();
+
+    console.log('payload:', payload)
 
     User.findOne({ googleId: payload.sub })
       .then(existingUser => {
