@@ -57,60 +57,26 @@ router.get('/callback', passport.authenticate('google', { failureRedirect: '/log
   }
 );
 
-router.post('/callback', async (req, res) => {
-  const accessToken = req.headers.authorization.split(' ')[1];
+router.post('/callback', 
+  passport.authenticate('google-token', { session: false }),  // Use the Google Token strategy
+  (req, res) => {
+    // If we reach here, authentication was successful
+    const user = req.user;
 
-  try {
-    // Verify the Google token with Google's API to get user info
-    const ticket = await client.verifyIdToken({
-      idToken: accessToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
+    // Generate JWT token for the user
+    const payload = { id: user.id, name: user.name };
+    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRATION }, (err, token) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error signing token' });
+      }
+      res.json({
+        success: true,
+        token: 'Bearer ' + token,
+        name: user.name
+      });
     });
-
-    console.log('ticket:', ticket)
-
-    const payload = ticket.getPayload();
-
-    console.log('payload:', payload)
-
-    User.findOne({ googleId: payload.sub })
-      .then(existingUser => {
-        if (existingUser) {
-          // Issue JWT token and send to client
-          const tokenPayload = { id: existingUser.id, name: existingUser.name };
-          jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRATION }, (err, token) => {
-            if (err) {
-              return res.status(500).json({ error: 'Error signing token' });
-            }
-            res.json({ success: true, token: 'Bearer ' + token });
-          });
-        } else {
-          // Create new user and then issue JWT
-          const newUser = new User({
-            googleId: payload.sub,
-            name: payload.name,
-            email: payload.email,
-            userType: 'google'
-          });
-
-          newUser.save()
-            .then(user => {
-              const tokenPayload = { id: user.id, name: user.name };
-              jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRATION }, (err, token) => {
-                if (err) {
-                  return res.status(500).json({ error: 'Error signing token' });
-                }
-                res.json({ success: true, token: 'Bearer ' + token });
-              });
-            })
-            .catch(err => res.status(500).json({ error: 'Error saving user' }));
-        }
-      })
-      .catch(err => res.status(500).json({ error: 'Error finding user' }));
-  } catch (err) {
-    res.status(400).json({ error: 'Invalid token' });
   }
-});
+);
 
 
 module.exports = router;
