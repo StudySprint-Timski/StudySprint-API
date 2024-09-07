@@ -145,7 +145,7 @@ router.post('/get-users', async(req, res) => {
 
         const friendIds = user.friends.map(f => f._id);
 
-        const friendRequestsSent = (await FriendRequest.find({'from': user}).select('to:_id')).map(fr => fr._id);
+        const friendRequestsSent = (await FriendRequest.find({'from': user}).select('to')).map(fr => fr.to._id.toString());
 
         const users = await User.find({
             '_id': {$ne: user._id},
@@ -158,7 +158,7 @@ router.post('/get-users', async(req, res) => {
         const result = users.map(u => ({
             ...u.toObject(),
             isFriend: friendIds.includes(u.toString()),
-            friendRequestSent: friendRequestsSent.includes(u._id),
+            friendRequestSent: friendRequestsSent.includes(u._id.toString()),
         }));
 
         res.send({"success": true, result })
