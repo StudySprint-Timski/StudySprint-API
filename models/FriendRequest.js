@@ -6,7 +6,7 @@ const FriendRequestSchema = new Schema({
     to: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     requestDate: { type: Date, default: Date.now, required: true },
     responseDate: { type: Date, default: undefined },
-    status: { type: string, default: 'created', required: true }
+    status: { type: String, default: 'created', required: true }
 });
 
 module.exports = mongoose.model('friend_requests', FriendRequestSchema);
