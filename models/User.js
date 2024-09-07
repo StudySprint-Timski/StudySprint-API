@@ -31,7 +31,10 @@ const UserSchema = new Schema({
   profilePicture: {
     type: String,
     default: null
-  }
+  },
+  friends: [
+    {type: mongoose.Schema.Types.ObjectId, ref: 'User'}
+  ]
 });
 
 module.exports = mongoose.model('users', UserSchema);
