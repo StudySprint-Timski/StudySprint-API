@@ -130,4 +130,32 @@ router.get('/get-friend-request', async(req, res) => {
     })
 })
 
+router.post('/get-users', async(req, res) => {
+    const userId = req.user.id;
+    const searchParam = req.body.searchParam;
+
+    await User.findById(userId).then(async (user) => {
+        if (!user) {
+            return res.status(404).json({ "success": false, reason: 'User not found' });
+        }
+
+        const friendIds = user.friends.map(f => f._id);
+
+        const users = await User.find({
+            '_id': {$ne: user._id},
+            $or: [
+                {'name': {$regex: searchParam, $options: 'i'}},
+                {'email': {$regex: searchParam, $options: 'i'}}
+            ]
+        }).select('_id name email profilePicture');
+
+        const result = users.map(u => ({
+            ...u.toObject(),
+            isFriend: friendIds.includes(u.toString())
+        }));
+
+        res.send({"success": true, result })
+    })
+})
+
 module.exports = router;
