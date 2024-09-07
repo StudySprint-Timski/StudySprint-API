@@ -14,7 +14,7 @@ router.post('/register', (req, res) => {
   const { name, email, password } = req.body;
   User.findOne({ email }).then(user => {
     if (user) {
-      return res.status(400).json({ email: 'Email already exists' });
+      return res.status(400).json({ success: false, reason: 'Email already exists' });
     } else {
       const newUser = new User({ name, email, password });
       bcrypt.genSalt(10, (err, salt) => {
@@ -38,7 +38,7 @@ router.post('/login', (req, res) => {
   const { email, password } = req.body;
   User.findOne({ email }).then(user => {
     if (!user) {
-      return res.status(404).json({ email: 'User not found' });
+      return res.status(404).json({ success: false, reason: 'User not found' });
     }
     bcrypt.compare(password, user.password).then(isMatch => {
       if (isMatch) {
