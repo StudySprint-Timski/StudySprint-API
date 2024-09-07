@@ -124,7 +124,7 @@ router.get('/get-friend-request', async(req, res) => {
             return res.status(404).json({ "success": false, reason: 'User not found' });
         }
 
-        const friendRequests = await FriendRequest.find(f => f.to = user);
+        const friendRequests = await FriendRequest.find({'to': user});
 
         return res.send({ "success": true, friendRequests })
     })
