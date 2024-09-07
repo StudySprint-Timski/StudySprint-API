@@ -51,12 +51,16 @@ router.post("/create-friend-request", async(req, res) => {
             return res.status(404).json({ "success": false, reason: 'User not found' })
         }
 
-        const newFriendRequest = new FriendRequest({
-            from: user,
-            to: friendUser,
-        })
+        const existingFriendRequest = FriendRequest.find({'from': user, 'to': friendUser});
 
-        await newFriendRequest.save();
+        if(!existingFriendRequest) {
+            const newFriendRequest = new FriendRequest({
+                from: user,
+                to: friendUser,
+            })
+    
+            await newFriendRequest.save();
+        }
 
         return res.send({ "success": true })
     })
@@ -141,6 +145,8 @@ router.post('/get-users', async(req, res) => {
 
         const friendIds = user.friends.map(f => f._id);
 
+        const friendRequestsSent = (await FriendRequest.find({'from': user}).select('to:_id')).map(fr => fr._id);
+
         const users = await User.find({
             '_id': {$ne: user._id},
             $or: [
@@ -151,7 +157,8 @@ router.post('/get-users', async(req, res) => {
 
         const result = users.map(u => ({
             ...u.toObject(),
-            isFriend: friendIds.includes(u.toString())
+            isFriend: friendIds.includes(u.toString()),
+            friendRequestSent: friendRequestsSent.includes(u._id),
         }));
 
         res.send({"success": true, result })
