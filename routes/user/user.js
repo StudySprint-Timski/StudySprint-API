@@ -128,7 +128,10 @@ router.get('/get-friend-request', async(req, res) => {
             return res.status(404).json({ "success": false, reason: 'User not found' });
         }
 
-        const friendRequests = await FriendRequest.find({'to': user});
+        const friendRequests = await FriendRequest
+            .find({'to': user, 'status': 'created'})
+            .populate('from', 'name email profilePicture')
+            .populate('to', 'name email profilePicture');
 
         return res.send({ "success": true, friendRequests })
     })
