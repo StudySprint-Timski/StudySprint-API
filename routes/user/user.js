@@ -149,9 +149,10 @@ router.post('/get-users', async(req, res) => {
         const friendIds = user.friends.map(f => f._id);
 
         const friendRequestsSent = (await FriendRequest.find({'from': user}).select('to')).map(fr => fr.to._id.toString());
+        const friendRequestsReceived = (await FriendRequest.find({'to': user}).select('from')).map(fr => fr.from._id.toString());
 
         const users = await User.find({
-            '_id': {$ne: user._id},
+            '_id': {$nin: [user._id, ...friendRequestsReceived]},
             $or: [
                 {'name': {$regex: searchParam, $options: 'i'}},
                 {'email': {$regex: searchParam, $options: 'i'}}
