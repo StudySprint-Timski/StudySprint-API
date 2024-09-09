@@ -12,6 +12,7 @@ const testRoutes = require('./routes/test/test')
 const sessionRoutes = require('./routes/session/session')
 const fileRoutes = require('./routes/file/file')
 const userRoutes = require('./routes/user/user')
+const friendsRoutes = require('./routes/friends/friends')
 
 const authenticate = require('./middleware/authenticate');
 const extractUser = require('./middleware/extractUser');
@@ -35,6 +36,7 @@ app.use('/test', [authenticate, extractUser], testRoutes);
 app.use('/session', [authenticate, extractUser], sessionRoutes);
 app.use('/file', [authenticate, extractUser], fileRoutes);
 app.use('/user', [authenticate, extractUser], userRoutes);
+app.use('/friends', [authenticate, extractUser], friendsRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
