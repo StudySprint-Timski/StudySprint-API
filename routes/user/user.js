@@ -71,4 +71,15 @@ router.post('/get-users', async(req, res) => {
     })
 })
 
+router.get('/get-user-profile', async(req, res) => {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId).select('_id name email profilePicture');
+    if (!user) {
+        return res.status(404).json({ "success": false, reason: 'User not found' });
+    }
+
+    return res.json({ "success": true, "user": user });
+})
+
 module.exports = router;
