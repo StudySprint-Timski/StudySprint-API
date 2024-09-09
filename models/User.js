@@ -33,7 +33,7 @@ const UserSchema = new Schema({
     default: null
   },
   friends: [
-    {type: mongoose.Schema.Types.ObjectId, ref: 'User'}
+    {type: mongoose.Schema.Types.ObjectId, ref: 'users'}
   ]
 });
 

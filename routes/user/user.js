@@ -66,59 +66,77 @@ router.post("/create-friend-request", async(req, res) => {
     })
 })
 
-router.post('/accept-friend-request', async(req, res) => {
+router.post('/accept-friend-request', async (req, res) => {
     const userId = req.user.id;
 
-    await User.findById(userId).then(async (user) => {
+    try {
+        // Find the current user
+        const user = await User.findById(userId).populate('friends');
         if (!user) {
             return res.status(404).json({ "success": false, reason: 'User not found' });
         }
 
-        const friendRequest = await FriendRequest.findById(req.body.friendRequestId);
-
-        if(!friendRequest) {
-            return res.status(404).json({ "success": false, reason: 'Friend request not found' })
+        // Find the friend request
+        const friendRequest = await FriendRequest.findById(req.body.friendRequestId).populate('from to');
+        if (!friendRequest) {
+            return res.status(404).json({ "success": false, reason: 'Friend request not found' });
         }
 
-        const friendUser = friendRequest.to
+        if (!friendRequest.from || !friendRequest.to) {
+            return res.status(404).json({ "success": false, reason: 'Friend not found' });
+        }
 
         friendRequest.status = 'accepted';
-        friendRequest.responseDate = Date.now;
+        friendRequest.responseDate = Date.now();
 
-        user.friends = [...user.friends, friendUser];
-        friendUser.friends = [...friendUser.friends, user];
-
-        await user.save();
-        await friendUser.save();
+        friendRequest.from.friends.push(friendRequest.to);
+        friendRequest.to.friends.push(friendRequest.from);
 
         await friendRequest.save();
 
-        return res.send({ "success": true })
-    })
-})
+        await user.save();
+        await friendRequest.from.save();
+        await friendRequest.to.save();
 
-router.post('/reject-friend-request', async(req, res) => {
+        return res.send({ "success": true });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ "success": false, reason: 'Server error' });
+    }
+});
+
+
+router.post('/reject-friend-request', async (req, res) => {
     const userId = req.user.id;
 
-    await User.findById(userId).then(async (user) => {
+    try {
+        // Find the current user
+        const user = await User.findById(userId).populate('friends');
         if (!user) {
             return res.status(404).json({ "success": false, reason: 'User not found' });
         }
 
-        const friendRequest = await FriendRequest.findById(req.body.friendRequestId);
+        // Find the friend request
+        const friendRequest = await FriendRequest.findById(req.body.friendRequestId).populate('from to');
+        if (!friendRequest) {
+            return res.status(404).json({ "success": false, reason: 'Friend request not found' });
+        }
 
-        if(!friendRequest) {
-            return res.status(404).json({ "success": false, reason: 'Friend request not found' })
+        if (!friendRequest.from || !friendRequest.to) {
+            return res.status(404).json({ "success": false, reason: 'Friend not found' });
         }
 
         friendRequest.status = 'rejected';
-        friendRequest.responseDate = Date.now;
+        friendRequest.responseDate = Date.now();
 
         await friendRequest.save();
 
-        return res.send({ "success": true })
-    })
-})
+        return res.send({ "success": true });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ "success": false, reason: 'Server error' });
+    }
+});
 
 router.get('/get-friend-request', async(req, res) => {
     const userId = req.user.id;
@@ -146,10 +164,12 @@ router.post('/get-users', async(req, res) => {
             return res.status(404).json({ "success": false, reason: 'User not found' });
         }
 
-        const friendIds = user.friends.map(f => f._id);
+        const friendIds = user.friends.map(f => f._id.toString());
 
-        const friendRequestsSent = (await FriendRequest.find({'from': user}).select('to')).map(fr => fr.to._id.toString());
-        const friendRequestsReceived = (await FriendRequest.find({'to': user}).select('from')).map(fr => fr.from._id.toString());
+        console.log('friendIds:',friendIds)
+
+        const friendRequestsSent = (await FriendRequest.find({'from': user, 'status': 'created'}).select('to')).map(fr => fr.to._id.toString());
+        const friendRequestsReceived = (await FriendRequest.find({'to': user, 'status': 'created'}).select('from')).map(fr => fr.from._id.toString());
 
         const users = await User.find({
             '_id': {$nin: [user._id, ...friendRequestsReceived]},
@@ -161,8 +181,8 @@ router.post('/get-users', async(req, res) => {
 
         const result = users.map(u => ({
             ...u.toObject(),
-            isFriend: friendIds.includes(u.toString()),
-            friendRequestSent: friendRequestsSent.includes(u._id.toString()),
+            isFriend: friendIds.indexOf(u._id.toString()) !== -1,
+            friendRequestSent: friendRequestsSent.indexOf(u._id.toString()) !== -1,
         }));
 
         res.send({"success": true, result })
