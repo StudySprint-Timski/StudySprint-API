@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 
-const uploadFileToMinio = require('../../utils/upload_file');
+const uploadFile = require('../../utils/upload_file');
 const User = require('../../models/User');
 const FriendRequest = require('../../models/FriendRequest');
 
@@ -14,28 +14,31 @@ router.put("/profile-picture", upload.single('file'), async (req, res) => {
     const file = req.file;
     const userId = req.user.id;
 
-    if(!file){
-        return res.status(400).json({ "success": false, "message": "No file sent" })
+    if (!file) {
+        return res.status(400).json({ success: false, message: "No file sent" });
     }
 
-    if (!file?.mimetype?.startsWith('image/')) {
-        return res.status(400).json({ "success": false, message: 'Uploaded file is not an image' });
+    if (!file.mimetype.startsWith('image/')) {
+        return res.status(400).json({ success: false, message: 'Uploaded file is not an image' });
     }
 
-    await User.findById(userId).then(async (user) => {
+    try {
+        const uploadResult = await uploadFile(file, userId);
+        const user = await User.findById(userId);
+        
         if (!user) {
-            return res.status(404).json({ "success": false, message: 'User not found' });
+            return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        const upload_result = await uploadFileToMinio(file, userId);
-
-        user.profilePicture = upload_result.fileUrl;
+        user.profilePicture = uploadResult.fileUrl;
         await user.save();
 
-        return res.send({ "success": true, "url": upload_result.fileUrl })
-    })
-
-})
+        res.send({ success: true, url: uploadResult.fileUrl });
+    } catch (error) {
+        console.error('Error updating profile picture:', error);
+        res.status(500).send({ success: false, message: 'Failed to update profile picture' });
+    }
+});
 
 router.post('/get-users', async(req, res) => {
     const userId = req.user.id;
