@@ -11,7 +11,19 @@ const PomodoroSessionSchema = new Schema({
     type: Date,
     default: Date.now
   },
-  users: [{ type: mongoose.Schema.Types.ObjectId, ref: User }]
+  users: [{ type: mongoose.Schema.Types.ObjectId, ref: User }],
+  workTimeDuration: {
+    type: Number,  // Work time duration in seconds
+    required: true
+  },
+  breakTimeDuration: {
+    type: Number,  // Break time duration in seconds
+    required: true
+  },
+  cycles: {
+    type: Number,  // Number of work/break cycles
+    required: true
+  }
 });
 
 module.exports = mongoose.model('sessions', PomodoroSessionSchema);

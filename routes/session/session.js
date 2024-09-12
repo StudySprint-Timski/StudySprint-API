@@ -1,137 +1,141 @@
 const express = require('express');
 const router = express.Router();
-const session = require('../../models/PomodoroSession');
+const Session = require('../../models/PomodoroSession');
 const User = require('../../models/User');
+const mongoose = require('mongoose');
 
+// Add a new session
 router.post('/add', async (req, res) => {
     try {
         const userId = req.user.id;
-        const users = req.body.users
+        let { users, sessionName } = req.body;
 
-        console.log('users:', users)
-
-        if(!users.includes(userId)) {
+        // Ensure the user initiating the session is included
+        if (!users.includes(userId)) {
             users.push(userId);
         }
 
-        for(let i=0;i<users.length;i++) {
-            const user = await User.findById(users[i])
-            if(!user) {
-                return res.status(400).send({
-                    success: false,
-                    message: "User not found"
-                })
-            }
+        // Verify all users exist in one query using $in
+        const validUsers = await User.find({
+            _id: { $in: users }
+        });
 
-            const userSession = await session.findOne({
-                users: {
-                    $in: [user._id.toString()]
-                }
-            })
+        if (validUsers.length !== users.length) {
+            return res.status(400).json({
+                success: false,
+                message: "One or more users not found."
+            });
+        }
 
-            if(userSession) {
-                return res.status(400).send({
-                    success: false,
-                    message: "User already in session",
-                    user: user._id.toString()
-                })
-            }
-        };
+        // Check if any user is already in an active session
+        const usersInSession = await Session.find({
+            users: { $in: users }
+        });
 
-        const sessionBody = {sessionName: req.body.sessionName, users: users, date: Date.now()}
-        const newSession = new session(sessionBody);
+        if (usersInSession.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: "One or more users are already in an active session.",
+                conflictingUsers: usersInSession.map(s => s.users)
+            });
+        }
+
+        // Create new session
+        const sessionBody = { sessionName, users, date: Date.now() };
+        const newSession = new Session(sessionBody);
         const savedSession = await newSession.save();
+
+        // Broadcast the creation of the session via socket.io
+        req.io.emit('newSession', savedSession);
+
         res.status(200).json(savedSession);
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
 });
 
+// Get all sessions
 router.get('/', async (req, res) => {
     try {
-        const sessions = await session.find().populate('users');
+        const sessions = await Session.find().populate('users');
         res.json(sessions);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 });
 
+// Get current session for the logged-in user
 router.get('/current', async (req, res) => {
     try {
         const userId = req.user.id;
 
-        const user = await User.findById(userId);
-        if(!user) {
-            return res.status(404).json({ "success": false, reason: 'User not found' });
+        const currentSession = await Session.findOne({
+            users: { $in: [userId] }
+        }).populate('users');
+
+        if (!currentSession) {
+            return res.status(200).json({ success: true, session: null });
         }
 
-        const currentSession = await session.findOne({
-            users: {
-                $in: [user._id.toString()]
-            }
-        })
-
-        res.status(200).json({
-            "success": true,
-            session: currentSession ?? null
-        })
+        res.status(200).json({ success: true, session: currentSession });
     } catch (error) {
-        console.error('Error getting current session:', error);
-        res.status(500).send({ success: false, message: 'Failed to get current session' });
+        res.status(500).json({ success: false, message: 'Failed to get current session' });
     }
-})
+});
 
+// Get friends' session status
 router.get('/friends-status', async (req, res) => {
-    const userId = req.user.id;
+    try {
+        const userId = req.user.id;
 
-    const user = await User.findById(userId).populate('friends');
-    if(!user) {
-        return res.status(404).json({ "success": false, reason: 'User not found' });
-    }
-
-    const friendsList = [];
-
-    for(let i=0;i<user.friends.length;i++) {
-        let friend = await User.findById(user.friends[i]._id);
-        if(!friend) {
-            continue;
+        const user = await User.findById(userId).populate('friends');
+        if (!user) {
+            return res.status(404).json({ success: false, reason: 'User not found' });
         }
 
-        const friendSession = await session.findOne({
-            users: {
-                $in: [friend._id.toString()]
-            }
-        })
+        const friendsIds = user.friends.map(friend => friend._id);
 
-        friendsList.push({
-            _id: friend._id,
-            name: friend.name,
-            email: friend.email,
-            profilePicture: friend.profilePicture,
-            isInSession: friendSession !== null
-        })
+        // Fetch friends and their session status in a single query
+        const friendsSessions = await Session.find({
+            users: { $in: friendsIds }
+        }).populate('users');
+
+        const friendsList = user.friends.map(friend => {
+            const isInSession = friendsSessions.some(session =>
+                session.users.some(u => u._id.toString() === friend._id.toString())
+            );
+            return {
+                _id: friend._id,
+                name: friend.name,
+                email: friend.email,
+                profilePicture: friend.profilePicture,
+                isInSession
+            };
+        });
+
+        res.status(200).json({ success: true, friendsList });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to fetch friends status' });
     }
+});
 
-    res.status(200).send({
-        success: true,
-        friendsList: friendsList
-    })
-})
-
+// Get session by ID
 router.get('/:id', async (req, res) => {
     try {
-        const sessionVariable = await session.findById(req.params.id).populate('users');
-        if (!sessionVariable)
+        const sessionVariable = await Session.findById(req.params.id).populate('users');
+        if (!sessionVariable) {
             return res.status(404).json({ message: 'Session not found' });
+        }
         res.json(sessionVariable);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 });
 
+// Update a session
 router.put('/edit/:id', async (req, res) => {
     try {
-        const updatedSession = await session.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedSession = await Session.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedSession) return res.status(404).json({ message: 'Session not found' });
         res.json(updatedSession);
     } catch (error) {
@@ -139,9 +143,10 @@ router.put('/edit/:id', async (req, res) => {
     }
 });
 
+// Delete a session
 router.delete('/delete/:id', async (req, res) => {
     try {
-        const deletedSession = await session.findByIdAndDelete(req.params.id);
+        const deletedSession = await Session.findByIdAndDelete(req.params.id);
         if (!deletedSession) return res.status(404).json({ message: 'Session not found' });
         res.json({ message: 'Session deleted successfully' });
     } catch (error) {
