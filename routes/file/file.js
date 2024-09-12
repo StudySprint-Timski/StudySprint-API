@@ -12,7 +12,7 @@ const upload = multer({ storage: storage });
 
 router.post('/upload', upload.single('file'), async (req, res) => {
   try{
-    const upload_result = await uploadFile(req.file, req.user.id, req.get("host"));
+    const upload_result = await uploadFile(req.file, req.user.id);
 
     // Respond with the file URL
     res.status(201).json({ "fileUrl": upload_result.fileUrl, "uploadDate": upload_result.uploadDate });

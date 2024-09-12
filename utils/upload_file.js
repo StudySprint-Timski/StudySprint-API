@@ -19,7 +19,7 @@ const s3Client = new S3Client({
     },
 });
 
-const uploadFile = async (file, userId, hostname) => {
+const uploadFile = async (file, userId) => {
     try {
         if (!file) {
             throw new Error('No file uploaded.');
@@ -71,7 +71,7 @@ const uploadFile = async (file, userId, hostname) => {
             Policy: JSON.stringify(policy)
         }));
 
-        const objectName = file.originalname;
+        const objectName = file.originalname.replaceAll(' ','_');
 
         // Upload the file to S3
         await s3Client.send(new PutObjectCommand({
@@ -82,13 +82,8 @@ const uploadFile = async (file, userId, hostname) => {
             ACL: "public-read"
         }));
 
-        const command = new GetObjectCommand({
-            Bucket: bucketName,
-            Key: objectName,
-        });
-
-        // Generate a signed URL (you can configure expiration time as needed)
-        const fileUrl = await getSignedUrl(s3Client, command); // 1-hour expiration
+        // Generate the public URL using the S3 object path
+        const fileUrl = `https://${bucketName}.s3.${process.env.S3_REGION}.amazonaws.com/${objectName}`;
 
         // Save the file metadata to the database
         const newFile = new File({
