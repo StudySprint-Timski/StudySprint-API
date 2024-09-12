@@ -33,7 +33,7 @@ app.use('/auth', authRoutes);
 app.use('/auth/google', googleAuthRoutes);
 app.use('/auth/discord', discordAuthRoutes);
 app.use('/test', [authenticate, extractUser], testRoutes);
-app.use('/session', [authenticate, extractUser], sessionRoutes);
+app.use('/pomodoro', [authenticate, extractUser], sessionRoutes);
 app.use('/file', [authenticate, extractUser], fileRoutes);
 app.use('/user', [authenticate, extractUser], userRoutes);
 app.use('/friends', [authenticate, extractUser], friendsRoutes);
