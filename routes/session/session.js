@@ -75,7 +75,7 @@ router.get('/current', async (req, res) => {
     const welcomeMessage = {
         message: 'hello'
     }
-    res.write(`data: ${JSON.stringify(welcomeMessage)}\n`)
+    res.write(`data: ${JSON.stringify(welcomeMessage)}\n\n`)
 
     const userId = req.user.id;
 
