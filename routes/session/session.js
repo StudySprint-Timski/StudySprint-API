@@ -66,21 +66,42 @@ router.get('/', async (req, res) => {
 
 // Get current session for the logged-in user
 router.get('/current', async (req, res) => {
-    try {
-        const userId = req.user.id;
-
-        const currentSession = await Session.findOne({
-            users: { $in: [userId] }
-        }).populate('users');
-
-        if (!currentSession) {
-            return res.status(200).json({ success: true, session: null });
-        }
-
-        res.status(200).json({ success: true, session: currentSession });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to get current session' });
+    const headers = {
+        'Content-Type': 'text/event-stream',
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache'
+    };
+    res.writeHead(200, headers);
+    const welcomeMessage = {
+        message: 'hello'
     }
+    res.write(`data: ${JSON.stringify(welcomeMessage)}\n`)
+
+    const userId = req.user.id;
+
+    const currentSession = await Session.findOne({
+        users: { $in: [userId] }
+    }).populate('users');
+
+    if (!currentSession) {
+        const noSessionMessage = {
+            message: 'no_active_session'
+        }
+        res.write(`data: ${JSON.stringify(noSessionMessage)}\n\n`)
+        return res.end();
+    }
+
+    setInterval(async () => {
+        const sessionMessage = {
+            message: 'currentSession',
+            sessionId: currentSession._id,
+        }
+        res.write(`data: ${JSON.stringify(sessionMessage)}\n\n`)
+    }, 15000)
+
+    res.on('close', () => {
+        return res.end();
+    });
 });
 
 // Get friends' session status
