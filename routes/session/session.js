@@ -72,18 +72,11 @@ router.get('/current', async (req, res) => {
         'Cache-Control': 'no-cache'
     };
     res.writeHead(200, headers);
-    const welcomeMessage = {
-        message: 'hello'
-    }
-    res.write(`data: ${JSON.stringify(welcomeMessage)}\n\n`)
 
-    const userId = req.user.id;
-
-    const currentSession = await Session.findOne({
-        users: { $in: [userId] }
-    }).populate('users');
-
-    setInterval(async () => {
+    const findSession = async () => {
+        const currentSession = await Session.findOne({
+            users: { $in: [userId] }
+        }).populate('users');
         if (!currentSession) {
             const noSessionMessage = {
                 message: 'no_active_session'
@@ -96,6 +89,14 @@ router.get('/current', async (req, res) => {
             }
             res.write(`data: ${JSON.stringify(sessionMessage)}\n\n`)
         }
+    }
+
+    const userId = req.user.id;
+    
+    findSession();
+
+    setInterval(async () => {
+        findSession()        
     }, 5000)
 
     res.on('close', () => {
