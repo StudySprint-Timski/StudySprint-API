@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const expressWs = require('express-ws')(router);
 const Session = require('../../models/PomodoroSession');
 const User = require('../../models/User');
 const mongoose = require('mongoose');
@@ -64,43 +65,54 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Get current session for the logged-in user
-router.get('/current', async (req, res) => {
-    const headers = {
-        'Content-Type': 'text/event-stream',
-        'Connection': 'keep-alive',
-        'Cache-Control': 'no-cache'
-    };
-    res.writeHead(200, headers);
+// // Get current session for the logged-in user
+// router.get('/current', async (req, res) => {
+//     const headers = {
+//         'Content-Type': 'text/event-stream',
+//         'Connection': 'keep-alive',
+//         'Cache-Control': 'no-cache'
+//     };
+//     res.writeHead(200, headers);
 
-    const findSession = async () => {
-        const currentSession = await Session.findOne({
-            users: { $in: [userId] }
-        }).populate('users');
-        if (!currentSession) {
-            const noSessionMessage = {
-                message: 'no_active_session'
-            }
-            res.write(`data: ${JSON.stringify(noSessionMessage)}\n\n`)
-        } else {
-            const sessionMessage = {
-                message: 'currentSession',
-                sessionId: currentSession._id,
-            }
-            res.write(`data: ${JSON.stringify(sessionMessage)}\n\n`)
-        }
-    }
+//     const findSession = async () => {
+//         const currentSession = await Session.findOne({
+//             users: { $in: [userId] }
+//         }).populate('users');
+//         if (!currentSession) {
+//             const noSessionMessage = {
+//                 message: 'no_active_session'
+//             }
+//             res.write(`data: ${JSON.stringify(noSessionMessage)}\n\n`)
+//         } else {
+//             const sessionMessage = {
+//                 message: 'currentSession',
+//                 sessionId: currentSession._id,
+//             }
+//             res.write(`data: ${JSON.stringify(sessionMessage)}\n\n`)
+//         }
+//     }
 
-    const userId = req.user.id;
+//     const userId = req.user.id;
     
-    findSession();
+//     findSession();
 
-    setInterval(async () => {
-        findSession()        
-    }, 5000)
+//     setInterval(async () => {
+//         findSession()        
+//     }, 5000)
 
-    res.on('close', () => {
-        return res.end();
+//     res.on('close', () => {
+//         return res.end();
+//     });
+// });
+
+router.ws('/current', (ws, req) => {
+    ws.on('message', function(msg) {
+        console.log('Received message:', msg);
+        ws.send(`Your message: ${msg}`);
+    });
+
+    // Handle WebSocket disconnection
+    ws.on('close', () => {
     });
 });
 

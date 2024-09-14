@@ -18,8 +18,11 @@ const friendsRoutes = require('./routes/friends/friends')
 
 const authenticate = require('./middleware/authenticate');
 const extractUser = require('./middleware/extractUser');
+const expressWs = require('express-ws');
 
 const app = express();
+expressWs(app);
+
 app.use(express.json());
 
 app.use(passport.initialize());
