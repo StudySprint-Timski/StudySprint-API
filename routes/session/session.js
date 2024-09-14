@@ -72,6 +72,10 @@ router.get('/current', async (req, res) => {
         'Cache-Control': 'no-cache'
     };
     res.writeHead(200, headers);
+    const welcomeMessage = {
+        message: 'hello'
+    }
+    res.write(`data: ${JSON.stringify(welcomeMessage)}\n`)
 
     const userId = req.user.id;
 
