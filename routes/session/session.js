@@ -72,10 +72,6 @@ router.get('/current', async (req, res) => {
         'Cache-Control': 'no-cache'
     };
     res.writeHead(200, headers);
-    const welcomeMessage = {
-        message: 'hello'
-    }
-    res.write(`data: ${JSON.stringify(welcomeMessage)}\n`)
 
     const userId = req.user.id;
 
@@ -83,21 +79,20 @@ router.get('/current', async (req, res) => {
         users: { $in: [userId] }
     }).populate('users');
 
-    if (!currentSession) {
-        const noSessionMessage = {
-            message: 'no_active_session'
-        }
-        res.write(`data: ${JSON.stringify(noSessionMessage)}\n\n`)
-        return res.end();
-    }
-
     setInterval(async () => {
-        const sessionMessage = {
-            message: 'currentSession',
-            sessionId: currentSession._id,
+        if (!currentSession) {
+            const noSessionMessage = {
+                message: 'no_active_session'
+            }
+            res.write(`data: ${JSON.stringify(noSessionMessage)}\n\n`)
+        } else {
+            const sessionMessage = {
+                message: 'currentSession',
+                sessionId: currentSession._id,
+            }
+            res.write(`data: ${JSON.stringify(sessionMessage)}\n\n`)
         }
-        res.write(`data: ${JSON.stringify(sessionMessage)}\n\n`)
-    }, 15000)
+    }, 5000)
 
     res.on('close', () => {
         return res.end();
