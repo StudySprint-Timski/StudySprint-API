@@ -1,9 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const expressWs = require('express-ws')(router);
+require('express-ws')(router);
 const Session = require('../../models/PomodoroSession');
 const User = require('../../models/User');
-const mongoose = require('mongoose');
 
 // Add a new session
 router.post('/add', async (req, res) => {
@@ -55,64 +54,71 @@ router.post('/add', async (req, res) => {
     }
 });
 
-// Get all sessions
-router.get('/', async (req, res) => {
-    try {
-        const sessions = await Session.find().populate('users');
-        res.json(sessions);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+
+router.ws('/', async (ws, req) => {
+    const user = await User.findById(req.user.id);
+    if(!user) {
+        ws.send('No user found!')
+        ws.close();
     }
-});
 
-// // Get current session for the logged-in user
-// router.get('/current', async (req, res) => {
-//     const headers = {
-//         'Content-Type': 'text/event-stream',
-//         'Connection': 'keep-alive',
-//         'Cache-Control': 'no-cache'
-//     };
-//     res.writeHead(200, headers);
+    const findExistingSession = async () => {
+        const existingSession = await Session.findOne({
+            users: { $in: [user]},
+            state: { $ne: 'ended' }
+        });
+        ws.send(JSON.stringify({
+            status: 'update_session',
+            session: existingSession
+        }))
+    }
 
-//     const findSession = async () => {
-//         const currentSession = await Session.findOne({
-//             users: { $in: [userId] }
-//         }).populate('users');
-//         if (!currentSession) {
-//             const noSessionMessage = {
-//                 message: 'no_active_session'
-//             }
-//             res.write(`data: ${JSON.stringify(noSessionMessage)}\n\n`)
-//         } else {
-//             const sessionMessage = {
-//                 message: 'currentSession',
-//                 sessionId: currentSession._id,
-//             }
-//             res.write(`data: ${JSON.stringify(sessionMessage)}\n\n`)
-//         }
-//     }
+    findExistingSession();
 
-//     const userId = req.user.id;
-    
-//     findSession();
+    setInterval(() => {
+        findExistingSession();
+    }, [1000])
 
-//     setInterval(async () => {
-//         findSession()        
-//     }, 5000)
-
-//     res.on('close', () => {
-//         return res.end();
-//     });
-// });
-
-router.ws('/current', (ws, req) => {
-    ws.on('message', function(msg) {
-        console.log('Received message:', msg);
-        ws.send(`Your message: ${msg}`);
+    ws.on('message', async (messageString) => {
+        const message = JSON.parse(messageString);
+        if(message.action === 'create_session') {
+            const existingSessions = await Session.findOne({
+                users: { $in: [user]}
+            });
+            if(existingSessions) {
+                ws.send(JSON.stringify({
+                    message: 'user_already_has_session'
+                }))
+            } else if(!message.workTimeInMinutes || !message.breakTimeInSeconds || !message.numOfCycles) {
+                ws.send(JSON.stringify({
+                    message: 'invalid_params'
+                }))
+            } else {
+                const newSession = new Session({
+                    sessionName: 'test123',
+                    workTimeDuration: message.workTimeInMinutes,
+                    breakTimeDuration: message.breakTimeInSeconds,
+                    cycles: message.numOfCycles,
+                    users: [user]
+                })
+                await newSession.save();
+                ws.send(JSON.stringify({
+                    status: 'created_session',
+                    session: newSession
+                }))
+            }
+        } else if (message.action === 'delete_session') {
+            await Session.findByIdAndDelete(message.id);
+            ws.send(JSON.stringify({
+                status: 'update_session',
+                session: null
+            }))
+        }
     });
 
     // Handle WebSocket disconnection
     ws.on('close', () => {
+        console.log('Closed')
     });
 });
 

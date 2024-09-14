@@ -1,19 +1,37 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 const User = require('./User');
+const crypto = require('crypto')
+
+function generateUniqueId() {
+  return '@'+crypto.randomBytes(3).toString('hex').toUpperCase();
+}
 
 const PomodoroSessionSchema = new Schema({
-  sessionName: {
+  sessionId: {
     type: String,
-    required: true
+    required: true,
+    default: generateUniqueId
   },
-  date: {
+  startDate: {
+    type: Date,
+    default: null
+  },
+  createdDate: {
     type: Date,
     default: Date.now
   },
+  lastUpdateDate: {
+    type: Date,
+    default: Date.now
+  },
+  state: {
+    type: String,
+    default: 'not_started'
+  },
   users: [{ type: mongoose.Schema.Types.ObjectId, ref: User }],
   workTimeDuration: {
-    type: Number,  // Work time duration in seconds
+    type: Number,  // Work time duration in minutes
     required: true
   },
   breakTimeDuration: {
