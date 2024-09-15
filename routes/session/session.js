@@ -113,6 +113,22 @@ router.ws('/', async (ws, req) => {
                 status: 'update_session',
                 session: null
             }))
+        } else if (message.action === 'join_session') {
+            const session = await Session.findById(message.id);
+            if(!session) {
+                ws.send(JSON.stringify({
+                    status: 'no_session_found',
+                    session: null
+                }))
+            } else {
+                session.users.push(user);
+                await session.save();
+    
+                ws.send(JSON.stringify({
+                    status: 'update_session',
+                    session: session
+                }))
+            }
         }
     });
 
