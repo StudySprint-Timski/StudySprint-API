@@ -29,6 +29,10 @@ const PomodoroSessionSchema = new Schema({
     type: String,
     default: 'not_started'
   },
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: User
+  },
   users: [{ type: mongoose.Schema.Types.ObjectId, ref: User }],
   workTimeDuration: {
     type: Number,  // Work time duration in minutes

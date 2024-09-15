@@ -67,9 +67,11 @@ router.ws('/', async (ws, req) => {
             users: { $in: [user]},
             state: { $ne: 'ended' }
         }).populate('users');
+
         ws.send(JSON.stringify({
             status: 'update_session',
-            session: existingSession
+            session: existingSession ?? null,
+            ownedByUser: existingSession?.owner?._id.toString() === user._id.toString()
         }))
     }
 
@@ -99,12 +101,15 @@ router.ws('/', async (ws, req) => {
                     workTimeDuration: message.workTimeInMinutes,
                     breakTimeDuration: message.breakTimeInSeconds,
                     cycles: message.numOfCycles,
+                    owner: user,
                     users: [user]
                 })
                 await newSession.save();
+
                 ws.send(JSON.stringify({
                     status: 'created_session',
-                    session: newSession
+                    session: newSession,
+                    ownedByUser: newSession.owner._id.toString() === user._id.toString()
                 }))
             }
         } else if (message.action === 'delete_session') {
@@ -115,6 +120,7 @@ router.ws('/', async (ws, req) => {
             }))
         } else if (message.action === 'join_session') {
             const session = await Session.findOne({ sessionId: message.id });
+            console.log(session)
             if(!session) {
                 ws.send(JSON.stringify({
                     status: 'no_session_found',
