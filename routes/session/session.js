@@ -66,7 +66,7 @@ router.ws('/', async (ws, req) => {
         const existingSession = await Session.findOne({
             users: { $in: [user]},
             state: { $ne: 'ended' }
-        });
+        }).populate('users');
         ws.send(JSON.stringify({
             status: 'update_session',
             session: existingSession
