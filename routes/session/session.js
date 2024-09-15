@@ -114,7 +114,7 @@ router.ws('/', async (ws, req) => {
                 session: null
             }))
         } else if (message.action === 'join_session') {
-            const session = await Session.findOne({ sessionId: id });
+            const session = await Session.findOne({ sessionId: message.id });
             if(!session) {
                 ws.send(JSON.stringify({
                     status: 'no_session_found',
