@@ -43,7 +43,7 @@ router.post('/add', async (req, res) => {
         }
 
         // Create new session
-        const sessionBody = { sessionName, users, date: new Date() };
+        const sessionBody = { sessionName, users, date: Date.now() };
         const newSession = new Session(sessionBody);
         const savedSession = await newSession.save();
 
@@ -70,27 +70,44 @@ router.ws('/', async (ws, req) => {
             state: { $ne: 'ended' }
         }).populate('users');
 
-        const currentDate = new Date();
+        if(!existingSession) {
+            ws.send(JSON.stringify({
+                status: 'update_session',
+                session: null,
+                ownedByUser: null,
+                remainingSeconds: 0
+            }))
+            return;
+        }
 
-        if(existingSession.state === 'work' && currentDate < dayjs(existingSession.lastUpdateDate).add(existingSession.workTimeDuration, 'minute').toDate()) {
-            if(existingSession.cycles === existingSession.passedCycles) {
+        const currentDate = Date.now();
+        console.log('currentDate:', currentDate)
+        console.log('workDate:', dayjs(existingSession.lastUpdateDate).add(existingSession.workTimeDuration, 'minute').toDate())
+
+        if(existingSession.state === 'work' && currentDate > dayjs(existingSession.lastUpdateDate).add(existingSession.workTimeDuration, 'minute').toDate()) {
+            console.log('HERE')
+            if(existingSession.cycles <= existingSession.passedCycles) {
                 existingSession.state = 'ended'
             } else {
+                console.log('HERE2')
                 existingSession.state = 'break'
             }
-            session.lastUpdateDate = currentDate;
-        } else if(existingSession.state === 'break' && currentDate < dayjs(existingSession.lastUpdateDate).add(existingSession.breakTimeDuration, 'second').toDate()) {
+            existingSession.lastUpdateDate = currentDate;
+        } else if(existingSession.state === 'break' && currentDate > dayjs(existingSession.lastUpdateDate).add(existingSession.breakTimeDuration, 'second').toDate()) {
             existingSession.state = 'work';
             existingSession.passedCycles++;
-            session.lastUpdateDate = currentDate;
+            existingSession.lastUpdateDate = currentDate;
         }
 
         await existingSession.save();
 
+        let nextEvent = existingSession.state === 'work' ? dayjs(existingSession.lastUpdateDate).add(existingSession.workTimeDuration, 'minute').toDate() : existingSession.state === 'break' ? dayjs(existingSession.lastUpdateDate).add(existingSession.breakTimeDuration, 'second').toDate() : currentDate;
+
         ws.send(JSON.stringify({
             status: 'update_session',
             session: existingSession ?? null,
-            ownedByUser: existingSession?.owner?._id.toString() === user._id.toString()
+            ownedByUser: existingSession?.owner?._id.toString() === user._id.toString(),
+            remainingSeconds: dayjs(nextEvent).subtract(currentDate).second()
         }))
     }
 
@@ -102,9 +119,11 @@ router.ws('/', async (ws, req) => {
 
     ws.on('message', async (messageString) => {
         const message = JSON.parse(messageString);
+        console.log(message)
         if(message.action === 'create_session') {
             const existingSessions = await Session.findOne({
-                users: { $in: [user]}
+                users: { $in: [user]},
+                state: { $ne: 'ended' }
             });
             if(existingSessions) {
                 ws.send(JSON.stringify({
@@ -154,7 +173,8 @@ router.ws('/', async (ws, req) => {
                 }))
             }
         } else if(message.action === 'start_session') {
-            const session = await Session.findOne({ sessionId: message.id });
+            const session = await Session.findById(message.id);
+            console.log('session:', session)
             if(!session) {
                 ws.send(JSON.stringify({
                     status: 'no_session_found',
@@ -162,7 +182,7 @@ router.ws('/', async (ws, req) => {
                 }))
             } else {
                 session.state = 'work';
-                session.lastUpdateDate = new Date();
+                session.lastUpdateDate = Date.now();
                 await session.save();
     
                 ws.send(JSON.stringify({
@@ -171,15 +191,16 @@ router.ws('/', async (ws, req) => {
                 }))
             }
         } else if(message.action === 'end_session') {
-            const session = await Session.findOne({ sessionId: message.id });
+            const session = await Session.findById(message.id);
             if(!session) {
                 ws.send(JSON.stringify({
                     status: 'no_session_found',
                     session: null
                 }))
+                return
             } else {
                 session.state = 'ended';
-                session.lastUpdateDate = new Date();
+                session.lastUpdateDate = Date.now();
                 await session.save();
     
                 ws.send(JSON.stringify({
