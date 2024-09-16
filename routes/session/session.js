@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 require('express-ws')(router);
+const dayjs = require('dayjs')
+
 const Session = require('../../models/PomodoroSession');
 const User = require('../../models/User');
 
@@ -41,7 +43,7 @@ router.post('/add', async (req, res) => {
         }
 
         // Create new session
-        const sessionBody = { sessionName, users, date: Date.now() };
+        const sessionBody = { sessionName, users, date: new Date() };
         const newSession = new Session(sessionBody);
         const savedSession = await newSession.save();
 
@@ -68,6 +70,23 @@ router.ws('/', async (ws, req) => {
             state: { $ne: 'ended' }
         }).populate('users');
 
+        const currentDate = new Date();
+
+        if(existingSession.state === 'work' && currentDate < dayjs(existingSession.lastUpdateDate).add(existingSession.workTimeDuration, 'minute').toDate()) {
+            if(existingSession.cycles === existingSession.passedCycles) {
+                existingSession.state = 'ended'
+            } else {
+                existingSession.state = 'break'
+            }
+            session.lastUpdateDate = currentDate;
+        } else if(existingSession.state === 'break' && currentDate < dayjs(existingSession.lastUpdateDate).add(existingSession.breakTimeDuration, 'second').toDate()) {
+            existingSession.state = 'work';
+            existingSession.passedCycles++;
+            session.lastUpdateDate = currentDate;
+        }
+
+        await existingSession.save();
+
         ws.send(JSON.stringify({
             status: 'update_session',
             session: existingSession ?? null,
@@ -79,7 +98,7 @@ router.ws('/', async (ws, req) => {
 
     setInterval(() => {
         findExistingSession();
-    }, [1000])
+    }, [100])
 
     ws.on('message', async (messageString) => {
         const message = JSON.parse(messageString);
@@ -120,7 +139,6 @@ router.ws('/', async (ws, req) => {
             }))
         } else if (message.action === 'join_session') {
             const session = await Session.findOne({ sessionId: message.id });
-            console.log(session)
             if(!session) {
                 ws.send(JSON.stringify({
                     status: 'no_session_found',
@@ -128,6 +146,40 @@ router.ws('/', async (ws, req) => {
                 }))
             } else {
                 session.users.push(user);
+                await session.save();
+    
+                ws.send(JSON.stringify({
+                    status: 'update_session',
+                    session: session
+                }))
+            }
+        } else if(message.action === 'start_session') {
+            const session = await Session.findOne({ sessionId: message.id });
+            if(!session) {
+                ws.send(JSON.stringify({
+                    status: 'no_session_found',
+                    session: null
+                }))
+            } else {
+                session.state = 'work';
+                session.lastUpdateDate = new Date();
+                await session.save();
+    
+                ws.send(JSON.stringify({
+                    status: 'update_session',
+                    session: session
+                }))
+            }
+        } else if(message.action === 'end_session') {
+            const session = await Session.findOne({ sessionId: message.id });
+            if(!session) {
+                ws.send(JSON.stringify({
+                    status: 'no_session_found',
+                    session: null
+                }))
+            } else {
+                session.state = 'ended';
+                session.lastUpdateDate = new Date();
                 await session.save();
     
                 ws.send(JSON.stringify({

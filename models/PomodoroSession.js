@@ -27,6 +27,7 @@ const PomodoroSessionSchema = new Schema({
   },
   state: {
     type: String,
+    enum: ['not_started', 'work', 'break', 'ended'],
     default: 'not_started'
   },
   owner: {
@@ -44,7 +45,11 @@ const PomodoroSessionSchema = new Schema({
   },
   cycles: {
     type: Number,  // Number of work/break cycles
-    required: true
+    required: true,
+  },
+  passedCycles: {
+    type: Number,
+    default: 1
   }
 });
 
