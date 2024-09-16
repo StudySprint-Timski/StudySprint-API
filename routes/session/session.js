@@ -108,7 +108,7 @@ router.ws('/', async (ws, req) => {
             status: 'update_session',
             session: existingSession ?? null,
             ownedByUser: existingSession?.owner?._id.toString() === user._id.toString(),
-            remainingSeconds: dayjs(nextEvent).subtract(currentDate).millisecond() / 1000
+            remainingSeconds: dayjs(nextEvent).subtract(currentDate).second()
         }))
     }
 
