@@ -116,7 +116,7 @@ router.ws('/', async (ws, req) => {
 
     setInterval(() => {
         findExistingSession();
-    }, [100])
+    }, [1000])
 
     ws.on('message', async (messageString) => {
         const message = JSON.parse(messageString);
